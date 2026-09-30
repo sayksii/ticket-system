@@ -8,10 +8,19 @@ spring:
     password: ${DB_PASSWORD:ticketpass}
     driver-class-name: com.mysql.cj.jdbc.Driver
 
+  data:
+    redis:
+      host: ${REDIS_HOST:redis}
+      port: ${REDIS_PORT:6379}
+      timeout: 2s
+
   sql:
     init:
       mode: always
       encoding: UTF-8
 
+ticket:
+  buy-mode: ${BUY_MODE:ATOMIC}
+
 demo:
-  delay-ms: ${DEMO_DELAY_MS:0}
+  delay-ms: ${DEMO_DELAY_MS:300}

@@ -16,6 +16,17 @@ services:
       retries: 30
     restart: unless-stopped
 
+  redis:
+    image: redis:7.4-alpine
+    container_name: ticket-redis
+    command: ["redis-server", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 2s
+      retries: 30
+    restart: unless-stopped
+
   backend:
     build:
       context: ./backend
@@ -26,11 +37,41 @@ services:
       DB_NAME: ticketdb
       DB_USER: ticketuser
       DB_PASSWORD: ticketpass
-      DEMO_DELAY_MS: 300
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      BUY_MODE: ${BUY_MODE:-ATOMIC}
+      DEMO_DELAY_MS: ${DEMO_DELAY_MS:-300}
     ports:
       - "18080:8080"
     depends_on:
       mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # 只有測 synchronized / distributed lock 的多 JVM 情境才啟動。
+  backend2:
+    profiles: ["multi"]
+    build:
+      context: ./backend
+    container_name: ticket-backend-2
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: ticketdb
+      DB_USER: ticketuser
+      DB_PASSWORD: ticketpass
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      BUY_MODE: ${BUY_MODE:-ATOMIC}
+      DEMO_DELAY_MS: ${DEMO_DELAY_MS:-300}
+    ports:
+      - "18082:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     restart: unless-stopped
 

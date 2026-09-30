@@ -4,6 +4,7 @@ public record TicketEvent(
         Long id,
         String name,
         Integer totalStock,
-        Integer stock
+        Integer stock,
+        Integer version
 ) {
 }

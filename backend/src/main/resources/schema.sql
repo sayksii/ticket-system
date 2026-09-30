@@ -3,6 +3,7 @@ CREATE TABLE IF NOT EXISTS ticket_event (
     name VARCHAR(200) NOT NULL,
     total_stock INT NOT NULL,
     stock INT NOT NULL,
+    version INT NOT NULL DEFAULT 0,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 

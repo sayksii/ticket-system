@@ -5,22 +5,41 @@ import com.example.ticketsystem.model.TicketEvent;
 import com.example.ticketsystem.model.TicketOrder;
 import com.example.ticketsystem.repository.TicketRepository;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Locale;
 
 @Service
 public class TicketService {
 
     private final TicketRepository ticketRepository;
+    private final UnsafeBuyService unsafeBuyService;
+    private final AtomicBuyService atomicBuyService;
+    private final OptimisticBuyService optimisticBuyService;
+    private final PessimisticBuyService pessimisticBuyService;
+    private final SynchronizedBuyService synchronizedBuyService;
+    private final DistributedLockBuyService distributedLockBuyService;
 
-    @Value("${demo.delay-ms:0}")
-    private long delayMs;
+    @Value("${ticket.buy-mode:ATOMIC}")
+    private String buyMode;
 
-    public TicketService(TicketRepository ticketRepository) {
+    public TicketService(
+            TicketRepository ticketRepository,
+            UnsafeBuyService unsafeBuyService,
+            AtomicBuyService atomicBuyService,
+            OptimisticBuyService optimisticBuyService,
+            PessimisticBuyService pessimisticBuyService,
+            SynchronizedBuyService synchronizedBuyService,
+            DistributedLockBuyService distributedLockBuyService
+    ) {
         this.ticketRepository = ticketRepository;
+        this.unsafeBuyService = unsafeBuyService;
+        this.atomicBuyService = atomicBuyService;
+        this.optimisticBuyService = optimisticBuyService;
+        this.pessimisticBuyService = pessimisticBuyService;
+        this.synchronizedBuyService = synchronizedBuyService;
+        this.distributedLockBuyService = distributedLockBuyService;
     }
 
     public List<TicketEvent> getEvents() {
@@ -36,46 +55,27 @@ public class TicketService {
         return ticketRepository.findOrdersByUserId(userId);
     }
 
-    @Transactional
+    public String getBuyMode() {
+        return buyMode;
+    }
+
     public BuyResponse buy(Long eventId, String userId) {
         if (userId == null || userId.isBlank()) {
             return new BuyResponse(false, "userId 不可為空", null, null);
         }
 
-        if (ticketRepository.existsOrder(eventId, userId)) {
-            return new BuyResponse(false, "同一使用者不能重複搶同一活動", null, null);
-        }
+        String mode = buyMode.trim().toUpperCase(Locale.ROOT);
 
-        TicketEvent event = getEvent(eventId);
-
-        if (event.stock() <= 0) {
-            return new BuyResponse(false, "票已售完", null, 0);
-        }
-
-        // PART 1 故意保留先查庫存、再計算、再更新的寫法。
-        // 單人操作可用，但高併發可能出現 Race Condition。
-        sleepIfNeeded();
-
-        int newStock = event.stock() - 1;
-        ticketRepository.setStock(eventId, newStock);
-
-        try {
-            Long orderId = ticketRepository.insertOrder(eventId, userId);
-            return new BuyResponse(true, "搶票成功", orderId, newStock);
-        } catch (DuplicateKeyException e) {
-            return new BuyResponse(false, "同一使用者不能重複搶同一活動", null, null);
-        }
-    }
-
-    private void sleepIfNeeded() {
-        if (delayMs <= 0) {
-            return;
-        }
-
-        try {
-            Thread.sleep(delayMs);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
+        return switch (mode) {
+            case "UNSAFE" -> unsafeBuyService.buy(eventId, userId);
+            case "ATOMIC" -> atomicBuyService.buy(eventId, userId);
+            case "OPTIMISTIC" -> optimisticBuyService.buy(eventId, userId);
+            case "PESSIMISTIC" -> pessimisticBuyService.buy(eventId, userId);
+            case "SYNCHRONIZED" -> synchronizedBuyService.buy(eventId, userId);
+            case "DISTRIBUTED_LOCK" -> distributedLockBuyService.buy(eventId, userId);
+            default -> throw new IllegalArgumentException(
+                    "未知 BUY_MODE：" + buyMode
+            );
+        };
     }
 }

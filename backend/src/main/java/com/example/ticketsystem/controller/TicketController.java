@@ -30,7 +30,8 @@ public class TicketController {
         try {
             return ResponseEntity.ok(ticketService.getEvent(eventId));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(404).body(Map.of("message", e.getMessage()));
+            return ResponseEntity.status(404)
+                    .body(Map.of("message", e.getMessage()));
         }
     }
 
@@ -49,6 +50,9 @@ public class TicketController {
 
     @GetMapping("/health")
     public Map<String, String> health() {
-        return Map.of("status", "UP");
+        return Map.of(
+                "status", "UP",
+                "buyMode", ticketService.getBuyMode()
+        );
     }
 }

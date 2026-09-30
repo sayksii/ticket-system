@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>搶票系統 Part 1</title>
+  <style>
+    body { font-family: sans-serif; max-width: 900px; margin: 30px auto; padding: 0 16px; }
+    input, button { padding: 8px; margin: 4px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+    #message { margin: 14px 0; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>搶票系統 Part 1</h1>
+
+  <label>
+    User ID：
+    <input id="userId" value="user001">
+  </label>
+
+  <button onclick="loadEvents()">重新整理活動</button>
+  <button onclick="loadOrders()">查我的訂單</button>
+
+  <div id="message"></div>
+
+  <h2>活動</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>活動</th>
+        <th>總票數</th>
+        <th>剩餘</th>
+        <th>操作</th>
+      </tr>
+    </thead>
+    <tbody id="eventRows"></tbody>
+  </table>
+
+  <h2>我的訂單</h2>
+  <pre id="orders">尚未查詢</pre>
+
+<script>
+  const API_BASE = `${location.protocol}//${location.hostname}:18080`;
+
+  function userId() {
+    return document.getElementById("userId").value.trim();
+  }
+
+  function showMessage(text) {
+    document.getElementById("message").textContent = text;
+  }
+
+  async function loadEvents() {
+    try {
+      const response = await fetch(`${API_BASE}/api/events`);
+      const events = await response.json();
+
+      document.getElementById("eventRows").innerHTML = events.map(event => `
+        <tr>
+          <td>${event.id}</td>
+          <td>${event.name}</td>
+          <td>${event.totalStock}</td>
+          <td>${event.stock}</td>
+          <td><button onclick="buy(${event.id})">搶票</button></td>
+        </tr>
+      `).join("");
+    } catch (e) {
+      showMessage(`讀取活動失敗：${e}`);
+    }
+  }
+
+  async function buy(eventId) {
+    if (!userId()) {
+      showMessage("請先輸入 userId");
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `${API_BASE}/api/events/${eventId}/buy?userId=${encodeURIComponent(userId())}`,
+        { method: "POST" }
+      );
+      const result = await response.json();
+      showMessage(JSON.stringify(result, null, 2));
+      await loadEvents();
+      await loadOrders();
+    } catch (e) {
+      showMessage(`搶票失敗：${e}`);
+    }
+  }
+
+  async function loadOrders() {
+    if (!userId()) {
+      showMessage("請先輸入 userId");
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `${API_BASE}/api/orders?userId=${encodeURIComponent(userId())}`
+      );
+      const result = await response.json();
+      document.getElementById("orders").textContent =
+        JSON.stringify(result, null, 2);
+    } catch (e) {
+      showMessage(`查詢訂單失敗：${e}`);
+    }
+  }
+
+  loadEvents();
+</script>
+</body>
+</html>

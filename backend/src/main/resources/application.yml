@@ -1,0 +1,17 @@
+server:
+  port: 8080
+
+spring:
+  datasource:
+    url: jdbc:mysql://${DB_HOST:mysql}:${DB_PORT:3306}/${DB_NAME:ticketdb}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Taipei
+    username: ${DB_USER:ticketuser}
+    password: ${DB_PASSWORD:ticketpass}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  sql:
+    init:
+      mode: always
+      encoding: UTF-8
+
+demo:
+  delay-ms: ${DEMO_DELAY_MS:0}

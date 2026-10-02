@@ -27,6 +27,25 @@ services:
       retries: 30
     restart: unless-stopped
 
+  rocketmq-namesrv:
+    image: apache/rocketmq:5.3.2
+    container_name: ticket-rocketmq-namesrv
+    command: sh mqnamesrv
+    environment:
+      JAVA_OPT_EXT: "-Xms256m -Xmx256m -Xmn128m"
+    restart: unless-stopped
+
+  rocketmq-broker:
+    image: apache/rocketmq:5.3.2
+    container_name: ticket-rocketmq-broker
+    command: sh mqbroker
+    environment:
+      NAMESRV_ADDR: rocketmq-namesrv:9876
+      JAVA_OPT_EXT: "-Xms512m -Xmx512m -Xmn256m"
+    depends_on:
+      - rocketmq-namesrv
+    restart: unless-stopped
+
   backend:
     build:
       context: ./backend
@@ -39,6 +58,9 @@ services:
       DB_PASSWORD: ticketpass
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      ROCKETMQ_NAMESRV: rocketmq-namesrv:9876
+      ROCKETMQ_TOPIC: ticket-order-topic
+      ROCKETMQ_PRODUCER_GROUP: ticket-order-producer-group
       BUY_MODE: ${BUY_MODE:-ATOMIC}
       DEMO_DELAY_MS: ${DEMO_DELAY_MS:-300}
     ports:
@@ -48,6 +70,33 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      rocketmq-namesrv:
+        condition: service_started
+      rocketmq-broker:
+        condition: service_started
+    restart: unless-stopped
+
+  order-worker:
+    build:
+      context: ./order-worker
+    container_name: ticket-order-worker
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: ticketdb
+      DB_USER: ticketuser
+      DB_PASSWORD: ticketpass
+      ROCKETMQ_NAMESRV: rocketmq-namesrv:9876
+      ROCKETMQ_TOPIC: ticket-order-topic
+      ROCKETMQ_CONSUMER_GROUP: ticket-order-consumer-group
+      ORDER_CONSUMER_DELAY_MS: ${ORDER_CONSUMER_DELAY_MS:-0}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      rocketmq-namesrv:
+        condition: service_started
+      rocketmq-broker:
+        condition: service_started
     restart: unless-stopped
 
   # 只有測 synchronized / distributed lock 的多 JVM 情境才啟動。
@@ -64,6 +113,9 @@ services:
       DB_PASSWORD: ticketpass
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      ROCKETMQ_NAMESRV: rocketmq-namesrv:9876
+      ROCKETMQ_TOPIC: ticket-order-topic
+      ROCKETMQ_PRODUCER_GROUP: ticket-order-producer-group
       BUY_MODE: ${BUY_MODE:-ATOMIC}
       DEMO_DELAY_MS: ${DEMO_DELAY_MS:-300}
     ports:
@@ -73,6 +125,10 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      rocketmq-namesrv:
+        condition: service_started
+      rocketmq-broker:
+        condition: service_started
     restart: unless-stopped
 
   frontend:

@@ -11,11 +11,15 @@ CREATE TABLE IF NOT EXISTS ticket_order (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     event_id BIGINT NOT NULL,
     user_id VARCHAR(100) NOT NULL,
+    message_id VARCHAR(64) NULL,
     status VARCHAR(30) NOT NULL DEFAULT 'SUCCESS',
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT uk_ticket_order_event_user
         UNIQUE (event_id, user_id),
+
+    CONSTRAINT uk_ticket_order_message
+        UNIQUE (message_id),
 
     CONSTRAINT fk_ticket_order_event
         FOREIGN KEY (event_id)

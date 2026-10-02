@@ -21,6 +21,7 @@ public class TicketService {
     private final SynchronizedBuyService synchronizedBuyService;
     private final DistributedLockBuyService distributedLockBuyService;
     private final RedisLuaBuyService redisLuaBuyService;
+    private final MqAsyncBuyService mqAsyncBuyService;
 
     @Value("${ticket.buy-mode:ATOMIC}")
     private String buyMode;
@@ -33,7 +34,8 @@ public class TicketService {
             PessimisticBuyService pessimisticBuyService,
             SynchronizedBuyService synchronizedBuyService,
             DistributedLockBuyService distributedLockBuyService,
-            RedisLuaBuyService redisLuaBuyService
+            RedisLuaBuyService redisLuaBuyService,
+            MqAsyncBuyService mqAsyncBuyService
     ) {
         this.ticketRepository = ticketRepository;
         this.unsafeBuyService = unsafeBuyService;
@@ -43,6 +45,7 @@ public class TicketService {
         this.synchronizedBuyService = synchronizedBuyService;
         this.distributedLockBuyService = distributedLockBuyService;
         this.redisLuaBuyService = redisLuaBuyService;
+        this.mqAsyncBuyService = mqAsyncBuyService;
     }
 
     public List<TicketEvent> getEvents() {
@@ -77,6 +80,7 @@ public class TicketService {
             case "SYNCHRONIZED" -> synchronizedBuyService.buy(eventId, userId);
             case "DISTRIBUTED_LOCK" -> distributedLockBuyService.buy(eventId, userId);
             case "REDIS_LUA" -> redisLuaBuyService.buy(eventId, userId);
+            case "REDIS_LUA_MQ" -> mqAsyncBuyService.buy(eventId, userId);
             default -> throw new IllegalArgumentException(
                     "未知 BUY_MODE：" + buyMode
             );

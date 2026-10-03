@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>搶票系統 Part 1</title>
+  <title>搶票系統 Part 7</title>
   <style>
     body { font-family: sans-serif; max-width: 900px; margin: 30px auto; padding: 0 16px; }
     input, button { padding: 8px; margin: 4px; }
@@ -13,7 +13,7 @@
   </style>
 </head>
 <body>
-  <h1>搶票系統 Part 1</h1>
+  <h1>搶票系統 Part 7</h1>
 
   <label>
     User ID：
@@ -43,7 +43,8 @@
   <pre id="orders">尚未查詢</pre>
 
 <script>
-  const API_BASE = `${location.protocol}//${location.hostname}:18080`;
+  // PART 7 改成同網域相對路徑：/api/* 由 Ingress 送到 Backend。
+  const API_BASE = "";
 
   function userId() {
     return document.getElementById("userId").value.trim();

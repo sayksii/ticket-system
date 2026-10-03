@@ -1,0 +1,180 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ticket-db-init
+  namespace: devops-test
+data:
+  001-schema.sql: |
+    CREATE TABLE IF NOT EXISTS ticket_event (
+        id BIGINT PRIMARY KEY AUTO_INCREMENT,
+        name VARCHAR(200) NOT NULL,
+        total_stock INT NOT NULL,
+        stock INT NOT NULL,
+        version INT NOT NULL DEFAULT 0,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS ticket_order (
+        id BIGINT PRIMARY KEY AUTO_INCREMENT,
+        event_id BIGINT NOT NULL,
+        user_id VARCHAR(100) NOT NULL,
+        message_id VARCHAR(64) NULL,
+        status VARCHAR(30) NOT NULL DEFAULT 'SUCCESS',
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+        CONSTRAINT uk_ticket_order_event_user
+            UNIQUE (event_id, user_id),
+
+        CONSTRAINT uk_ticket_order_message
+            UNIQUE (message_id),
+
+        CONSTRAINT fk_ticket_order_event
+            FOREIGN KEY (event_id)
+            REFERENCES ticket_event(id)
+    );
+
+  002-data.sql: |
+    INSERT INTO ticket_event(name, total_stock, stock)
+    SELECT 'Kubernetes DevOps Concert', 20, 20
+    WHERE NOT EXISTS (
+        SELECT 1
+        FROM ticket_event
+        WHERE name = 'Kubernetes DevOps Concert'
+    );
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ticket-mysql-headless
+  namespace: devops-test
+spec:
+  clusterIP: None
+  selector:
+    app: ticket-mysql
+  ports:
+    - name: mysql
+      port: 3306
+      targetPort: mysql
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ticket-mysql
+  namespace: devops-test
+spec:
+  selector:
+    app: ticket-mysql
+  ports:
+    - name: mysql
+      port: 3306
+      targetPort: mysql
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: ticket-mysql
+  namespace: devops-test
+spec:
+  serviceName: ticket-mysql-headless
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ticket-mysql
+  template:
+    metadata:
+      labels:
+        app: ticket-mysql
+    spec:
+      containers:
+        - name: mysql
+          image: mysql:8.4
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: mysql
+              containerPort: 3306
+
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ticket-db-secret
+                  key: MYSQL_ROOT_PASSWORD
+            - name: MYSQL_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: ticket-db-secret
+                  key: MYSQL_DATABASE
+            - name: MYSQL_USER
+              valueFrom:
+                secretKeyRef:
+                  name: ticket-db-secret
+                  key: MYSQL_USER
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ticket-db-secret
+                  key: MYSQL_PASSWORD
+
+          volumeMounts:
+            - name: mysql-data
+              mountPath: /var/lib/mysql
+            - name: db-init
+              mountPath: /docker-entrypoint-initdb.d
+              readOnly: true
+
+          startupProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - 'mysqladmin ping -h 127.0.0.1 -uroot -p"$MYSQL_ROOT_PASSWORD" --silent'
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 60
+
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - 'mysqladmin ping -h 127.0.0.1 -uroot -p"$MYSQL_ROOT_PASSWORD" --silent'
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 6
+
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - 'mysqladmin ping -h 127.0.0.1 -uroot -p"$MYSQL_ROOT_PASSWORD" --silent'
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 6
+
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+
+      volumes:
+        - name: db-init
+          configMap:
+            name: ticket-db-init
+
+  volumeClaimTemplates:
+    - metadata:
+        name: mysql-data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        storageClassName: local-path
+        resources:
+          requests:
+            storage: 5Gi

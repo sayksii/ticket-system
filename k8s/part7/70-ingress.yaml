@@ -1,0 +1,26 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ticket-ingress
+  namespace: devops-test
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: ticket.local
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: ticket-backend
+                port:
+                  number: 8080
+
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ticket-frontend
+                port:
+                  number: 80

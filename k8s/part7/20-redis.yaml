@@ -1,0 +1,106 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ticket-redis-headless
+  namespace: devops-test
+spec:
+  clusterIP: None
+  selector:
+    app: ticket-redis
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: redis
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ticket-redis
+  namespace: devops-test
+spec:
+  selector:
+    app: ticket-redis
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: redis
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: ticket-redis
+  namespace: devops-test
+spec:
+  serviceName: ticket-redis-headless
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ticket-redis
+  template:
+    metadata:
+      labels:
+        app: ticket-redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:7.4-alpine
+          imagePullPolicy: IfNotPresent
+          args:
+            - redis-server
+            - --appendonly
+            - "yes"
+          ports:
+            - name: redis
+              containerPort: 6379
+
+          volumeMounts:
+            - name: redis-data
+              mountPath: /data
+
+          startupProbe:
+            exec:
+              command:
+                - redis-cli
+                - ping
+            periodSeconds: 3
+            timeoutSeconds: 2
+            failureThreshold: 30
+
+          readinessProbe:
+            exec:
+              command:
+                - redis-cli
+                - ping
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 3
+
+          livenessProbe:
+            exec:
+              command:
+                - redis-cli
+                - ping
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 300m
+              memory: 256Mi
+
+  volumeClaimTemplates:
+    - metadata:
+        name: redis-data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        storageClassName: local-path
+        resources:
+          requests:
+            storage: 1Gi

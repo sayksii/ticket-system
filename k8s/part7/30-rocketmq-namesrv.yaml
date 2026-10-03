@@ -1,0 +1,71 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: rocketmq-namesrv
+  namespace: devops-test
+spec:
+  selector:
+    app: rocketmq-namesrv
+  ports:
+    - name: namesrv
+      port: 9876
+      targetPort: namesrv
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rocketmq-namesrv
+  namespace: devops-test
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rocketmq-namesrv
+  template:
+    metadata:
+      labels:
+        app: rocketmq-namesrv
+    spec:
+      containers:
+        - name: namesrv
+          image: apache/rocketmq:5.3.2
+          imagePullPolicy: IfNotPresent
+          args:
+            - sh
+            - mqnamesrv
+          env:
+            - name: JAVA_OPT_EXT
+              value: -Xms256m -Xmx256m -Xmn128m
+          ports:
+            - name: namesrv
+              containerPort: 9876
+
+          startupProbe:
+            tcpSocket:
+              port: namesrv
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 60
+
+          readinessProbe:
+            tcpSocket:
+              port: namesrv
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 6
+
+          livenessProbe:
+            tcpSocket:
+              port: namesrv
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 6
+
+          resources:
+            requests:
+              cpu: 100m
+              memory: 384Mi
+            limits:
+              cpu: 500m
+              memory: 640Mi

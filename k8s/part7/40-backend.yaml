@@ -1,0 +1,99 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ticket-backend
+  namespace: devops-test
+spec:
+  selector:
+    app: ticket-backend
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ticket-backend
+  namespace: devops-test
+spec:
+  replicas: 2
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+
+  selector:
+    matchLabels:
+      app: ticket-backend
+
+  template:
+    metadata:
+      labels:
+        app: ticket-backend
+    spec:
+      imagePullSecrets:
+        - name: harbor-secret
+
+      containers:
+        - name: backend
+          image: 10.10.10.20:8858/devops-test/ticket-backend:part7-v1
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8080
+
+          envFrom:
+            - configMapRef:
+                name: ticket-config
+
+          env:
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: ticket-db-secret
+                  key: MYSQL_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ticket-db-secret
+                  key: MYSQL_PASSWORD
+            # DB schema 已由 MySQL /docker-entrypoint-initdb.d 建立，
+            # 避免多個 Backend Replica 同時執行 schema/data init。
+            - name: SPRING_SQL_INIT_MODE
+              value: never
+
+          startupProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 30
+
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi

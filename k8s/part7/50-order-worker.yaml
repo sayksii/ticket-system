@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ticket-order-worker
+  namespace: devops-test
+spec:
+  replicas: 1
+  revisionHistoryLimit: 5
+
+  selector:
+    matchLabels:
+      app: ticket-order-worker
+
+  template:
+    metadata:
+      labels:
+        app: ticket-order-worker
+    spec:
+      imagePullSecrets:
+        - name: harbor-secret
+
+      containers:
+        - name: order-worker
+          image: 10.10.10.20:8858/devops-test/ticket-order-worker:part7-v1
+          imagePullPolicy: Always
+
+          envFrom:
+            - configMapRef:
+                name: ticket-config
+
+          env:
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: ticket-db-secret
+                  key: MYSQL_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ticket-db-secret
+                  key: MYSQL_PASSWORD
+
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi

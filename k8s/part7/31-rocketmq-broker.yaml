@@ -1,0 +1,103 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: rocketmq-broker-headless
+  namespace: devops-test
+spec:
+  clusterIP: None
+  selector:
+    app: rocketmq-broker
+  ports:
+    - name: listen
+      port: 10911
+      targetPort: listen
+    - name: ha
+      port: 10912
+      targetPort: ha
+    - name: fast
+      port: 10909
+      targetPort: fast
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: rocketmq-broker
+  namespace: devops-test
+spec:
+  serviceName: rocketmq-broker-headless
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rocketmq-broker
+  template:
+    metadata:
+      labels:
+        app: rocketmq-broker
+    spec:
+      securityContext:
+        fsGroup: 3000
+
+      containers:
+        - name: broker
+          image: apache/rocketmq:5.3.2
+          imagePullPolicy: IfNotPresent
+          args:
+            - sh
+            - mqbroker
+          env:
+            - name: NAMESRV_ADDR
+              value: rocketmq-namesrv:9876
+            - name: JAVA_OPT_EXT
+              value: -Xms512m -Xmx512m -Xmn256m
+          ports:
+            - name: fast
+              containerPort: 10909
+            - name: listen
+              containerPort: 10911
+            - name: ha
+              containerPort: 10912
+
+          volumeMounts:
+            - name: broker-store
+              mountPath: /home/rocketmq/store
+
+          startupProbe:
+            tcpSocket:
+              port: listen
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 60
+
+          readinessProbe:
+            tcpSocket:
+              port: listen
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 6
+
+          livenessProbe:
+            tcpSocket:
+              port: listen
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 6
+
+          resources:
+            requests:
+              cpu: 200m
+              memory: 640Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+
+  volumeClaimTemplates:
+    - metadata:
+        name: broker-store
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        storageClassName: local-path
+        resources:
+          requests:
+            storage: 2Gi

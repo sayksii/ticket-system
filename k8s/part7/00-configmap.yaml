@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ticket-config
+  namespace: devops-test
+data:
+  DB_HOST: ticket-mysql
+  DB_PORT: "3306"
+  DB_NAME: ticketdb
+
+  REDIS_HOST: ticket-redis
+  REDIS_PORT: "6379"
+
+  ROCKETMQ_NAMESRV: rocketmq-namesrv:9876
+  ROCKETMQ_TOPIC: ticket-order-topic
+  ROCKETMQ_PRODUCER_GROUP: ticket-order-producer-group
+  ROCKETMQ_CONSUMER_GROUP: ticket-order-consumer-group
+
+  BUY_MODE: REDIS_LUA_MQ
+  DEMO_DELAY_MS: "0"
+  ORDER_CONSUMER_DELAY_MS: "0"

@@ -3,115 +3,66 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>搶票系統 Part 7</title>
-  <style>
-    body { font-family: sans-serif; max-width: 900px; margin: 30px auto; padding: 0 16px; }
-    input, button { padding: 8px; margin: 4px; }
-    table { width: 100%; border-collapse: collapse; margin-top: 16px; }
-    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
-    #message { margin: 14px 0; white-space: pre-wrap; }
-  </style>
+  <meta name="theme-color" content="#f8f8f8">
+  <title>ticket.｜活動與票券</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" type="module"></script>
 </head>
 <body>
-  <h1>搶票系統 Part 7</h1>
-
-  <label>
-    User ID：
-    <input id="userId" value="user001">
-  </label>
-
-  <button onclick="loadEvents()">重新整理活動</button>
-  <button onclick="loadOrders()">查我的訂單</button>
-
-  <div id="message"></div>
-
-  <h2>活動</h2>
-  <table>
-    <thead>
-      <tr>
-        <th>ID</th>
-        <th>活動</th>
-        <th>總票數</th>
-        <th>剩餘</th>
-        <th>操作</th>
-      </tr>
-    </thead>
-    <tbody id="eventRows"></tbody>
-  </table>
-
-  <h2>我的訂單</h2>
-  <pre id="orders">尚未查詢</pre>
-
-<script>
-  // PART 7 改成同網域相對路徑：/api/* 由 Ingress 送到 Backend。
-  const API_BASE = "";
-
-  function userId() {
-    return document.getElementById("userId").value.trim();
-  }
-
-  function showMessage(text) {
-    document.getElementById("message").textContent = text;
-  }
-
-  async function loadEvents() {
-    try {
-      const response = await fetch(`${API_BASE}/api/events`);
-      const events = await response.json();
-
-      document.getElementById("eventRows").innerHTML = events.map(event => `
-        <tr>
-          <td>${event.id}</td>
-          <td>${event.name}</td>
-          <td>${event.totalStock}</td>
-          <td>${event.stock}</td>
-          <td><button onclick="buy(${event.id})">搶票</button></td>
-        </tr>
-      `).join("");
-    } catch (e) {
-      showMessage(`讀取活動失敗：${e}`);
-    }
-  }
-
-  async function buy(eventId) {
-    if (!userId()) {
-      showMessage("請先輸入 userId");
-      return;
-    }
-
-    try {
-      const response = await fetch(
-        `${API_BASE}/api/events/${eventId}/buy?userId=${encodeURIComponent(userId())}`,
-        { method: "POST" }
-      );
-      const result = await response.json();
-      showMessage(JSON.stringify(result, null, 2));
-      await loadEvents();
-      await loadOrders();
-    } catch (e) {
-      showMessage(`搶票失敗：${e}`);
-    }
-  }
-
-  async function loadOrders() {
-    if (!userId()) {
-      showMessage("請先輸入 userId");
-      return;
-    }
-
-    try {
-      const response = await fetch(
-        `${API_BASE}/api/orders?userId=${encodeURIComponent(userId())}`
-      );
-      const result = await response.json();
-      document.getElementById("orders").textContent =
-        JSON.stringify(result, null, 2);
-    } catch (e) {
-      showMessage(`查詢訂單失敗：${e}`);
-    }
-  }
-
-  loadEvents();
-</script>
+  <a class="skip-link" href="#events">跳至活動列表</a>
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="brand" href="/" aria-label="ticket. 首頁">
+        <span class="brand-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 5h16v5a2 2 0 0 0 0 4v5H4v-5a2 2 0 0 0 0-4V5Z"/><path d="M15 5v3m0 3v2m0 3v3"/></svg></span>
+        <span>ticket<span class="brand-dot">.</span></span>
+      </a>
+      <nav class="header-nav" aria-label="主選單"><a href="#events" class="active">探索活動</a></nav>
+      <div class="account">
+        <span class="account-label">我的票券</span>
+        <button id="accountButton" class="avatar-button" aria-label="開啟我的訂單" aria-haspopup="dialog" aria-expanded="false" aria-controls="orderPanel">
+          <span id="avatarInitial" aria-hidden="true">U</span>
+          <span id="orderDot" class="notification-dot" hidden></span>
+        </button>
+        <section id="orderPanel" class="order-panel" role="dialog" aria-labelledby="ordersTitle" hidden>
+          <div class="panel-heading">
+            <h2 id="ordersTitle">我的訂單 <span id="orderCount" class="count-badge">0</span></h2>
+            <button id="closeOrders" class="icon-button" aria-label="關閉我的訂單">×</button>
+          </div>
+          <form id="userForm" class="user-form">
+            <label for="userId">使用者 ID</label>
+            <div class="user-input-row"><input id="userId" name="userId" value="user001" maxlength="100" required autocomplete="off" spellcheck="false"><button type="submit" class="small-button">切換</button></div>
+          </form>
+          <div class="orders-toolbar"><span id="ordersHint">訂單依成立時間排列</span><button id="refreshOrders" class="text-button">重新整理</button></div>
+          <div id="ordersList" class="orders-list" aria-live="polite"><p class="panel-empty">正在讀取你的訂單…</p></div>
+          <p class="panel-footnote">每場活動限購一張。</p>
+        </section>
+      </div>
+    </div>
+  </header>
+  <main class="page">
+    <section class="intro" aria-labelledby="pageTitle">
+      <p class="eyebrow">EVENTS &amp; TICKETS</p>
+      <h1 id="pageTitle">活動與票券</h1>
+      <p class="intro-description">瀏覽活動、查看剩餘票數。搶票後，可在右上角查詢訂單。</p>
+    </section>
+    <section id="events" aria-labelledby="eventsTitle">
+      <div class="section-toolbar">
+        <div class="section-heading"><h2 id="eventsTitle">所有活動</h2><span id="eventCount" class="muted">讀取中</span></div>
+        <div class="toolbar-actions">
+          <div class="filters" role="group" aria-label="活動類別">
+            <button class="filter active" data-category="all" aria-pressed="true">全部</button>
+            <button class="filter" data-category="music" aria-pressed="false">音樂現場</button>
+            <button class="filter" data-category="talk" aria-pressed="false">講座工作坊</button>
+            <button class="filter" data-category="culture" aria-pressed="false">藝文生活</button>
+          </div>
+          <button id="refreshEvents" class="refresh-button" aria-label="重新整理活動"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M20 8a8 8 0 1 0 0 8M20 3v5h-5"/></svg></button>
+        </div>
+      </div>
+      <p id="eventError" class="inline-error" role="alert" hidden></p>
+      <div id="eventGrid" class="event-grid" aria-live="polite" aria-busy="true"><p class="grid-message">正在載入活動…</p></div>
+    </section>
+    <footer class="site-footer"><span>ticket.</span></footer>
+  </main>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden><span id="toastIcon" class="toast-icon" aria-hidden="true"></span><span id="toastText"></span><button id="dismissToast" aria-label="關閉通知">×</button></div>
 </body>
 </html>

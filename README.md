@@ -1,40 +1,25 @@
-# ticket-system-part1
+# Ticket System
 
-PART 1：最小可跑搶票系統。
+模擬熱門活動開賣時多人同時搶票，提供活動瀏覽、搶票與訂單查詢，並整合 Kubernetes 部署與 Jenkins CI/CD。
 
-## 啟動
+![Architecture & CI/CD Pipeline](docs/architecture.png)
 
-```bash
-docker compose up --build -d
-docker compose ps
-```
+## 實作重點
 
-Browser：
+- Redis Lua：原子庫存預扣、資格檢查與防重複購買。
+- RocketMQ + Order Worker：非同步下單，透過 MySQL 交易與冪等處理更新訂單及庫存。
+- 異常處理：MQ 發送失敗時回補 Redis，前端確認訂單成立後才顯示成功。
+- CI/CD：Jenkins 執行測試與品質檢查，在 Harbor VM 遠端建置、推送映像，再進行 Kubernetes 滾動更新與 Smoke Test。
 
-```text
-http://<HOST_IP>:18081
-```
+## 技術
 
-Backend health：
+Java 21 / Spring Boot / MySQL / Redis / RocketMQ / Docker / Kubernetes / Traefik / Jenkins / SonarQube / Harbor
 
-```text
-http://<HOST_IP>:18080/api/health
-```
+## 專案結構
 
-## 停止
-
-```bash
-docker compose down
-```
-
-若連 MySQL Volume 一起刪：
-
-```bash
-docker compose down -v
-```
-
-## 注意
-
-PART 1 的 `buy()` 故意使用「先查庫存，再更新」。
-單人操作可以工作，但高併發可能發生 Race Condition。
-PART 2 會故意放大這個問題並壓測。
+- `backend/`：API 與搶票邏輯
+- `frontend/`：活動頁面與訂單介面
+- `order-worker/`：訂單訊息消費與資料庫寫入
+- `k8s/part7/`：Kubernetes 設定
+- `Jenkinsfile`、`ci/part8/`：CI/CD 流程
+- `scripts/`：測試、前端預覽與維運腳本

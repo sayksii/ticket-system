@@ -1,0 +1,20 @@
+# Optional:
+# 只有目前 jenkins-maven:lts 裡缺 ssh / scp / ssh-keyscan 時才需要 Build。
+#
+# Build context 建議直接用專案根目錄：
+# docker build -f jenkins/Dockerfile.part8 \
+#   -t 10.10.10.20:8858/devops-test/jenkins-maven:part8 .
+
+FROM 10.10.10.20:8858/devops-test/jenkins-maven:lts
+
+USER root
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+      openssh-client \
+      curl \
+      tar \
+      ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
+
+USER jenkins

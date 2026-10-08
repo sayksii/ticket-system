@@ -6,7 +6,9 @@
   <meta name="theme-color" content="#f8f8f8">
   <title>ticket.｜活動與票券123</title>
   <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/developer.css">
   <script src="/app.js" type="module"></script>
+  <script src="/developer.js" type="module"></script>
 </head>
 <body>
   <a class="skip-link" href="#events">跳至活動列表</a>
@@ -18,6 +20,7 @@
       </a>
       <nav class="header-nav" aria-label="主選單"><a href="#events" class="active">探索活動</a></nav>
       <div class="account">
+        <button id="developerButton" class="developer-button" aria-haspopup="dialog"><span aria-hidden="true">&lt;/&gt;</span> 開發者</button>
         <span class="account-label">我的票券</span>
         <button id="accountButton" class="avatar-button" aria-label="開啟我的訂單" aria-haspopup="dialog" aria-expanded="false" aria-controls="orderPanel">
           <span id="avatarInitial" aria-hidden="true">U</span>
@@ -63,6 +66,35 @@
     </section>
     <footer class="site-footer"><span>ticket.</span></footer>
   </main>
+  <dialog id="developerDialog" class="developer-dialog" aria-labelledby="developerTitle">
+    <header class="developer-heading"><div><p class="developer-eyebrow">DEVELOPER TOOLS</p><h2 id="developerTitle">開發者工具</h2></div><button id="closeDeveloper" class="developer-close" aria-label="關閉開發者工具">×</button></header>
+    <div class="developer-layout">
+      <nav class="developer-menu" aria-label="開發者操作">
+        <button data-operation="state" class="selected" aria-pressed="true">庫存與訂單<span>查看目前資料</span></button>
+        <button data-operation="load" aria-pressed="false">多人搶票<span>觀察非同步下單</span></button>
+        <button data-operation="duplicate" aria-pressed="false">重複購買<span>同一用戶連續送出</span></button>
+        <button data-operation="reset" aria-pressed="false">重設活動<span>清除單一活動訂單</span></button>
+      </nav>
+      <section class="developer-content">
+        <p id="developerAvailability" class="developer-notice" role="status" hidden></p>
+        <div class="developer-fields">
+          <label>選擇活動<select id="developerEvent"></select></label>
+          <label id="developerStockField" hidden>重設後票數<input id="developerStock" type="number" value="20" min="1" max="1000"></label>
+          <label id="developerRequestsField" hidden>請求數<input id="developerRequests" type="number" value="100" min="1" max="500"></label>
+          <label id="developerConcurrencyField" hidden>同時送出<input id="developerConcurrency" type="number" value="5" min="1" max="10"></label>
+        </div>
+        <h3 id="developerOperationTitle">庫存與訂單</h3>
+        <p id="developerDescription" class="developer-description"></p>
+        <ol id="developerSteps" class="developer-steps"></ol>
+        <div class="developer-code-heading"><span>參考指令 · Bash</span><button id="copyDeveloperCommand" class="small-button">複製指令</button></div>
+        <pre class="developer-code"><code id="developerCommand"></code></pre>
+        <label id="developerConsentField" class="developer-consent" hidden><input id="developerConsent" type="checkbox"><span id="developerConsentText"></span></label>
+        <div class="developer-actions"><button id="previewDeveloper" class="small-button">更新預覽</button><button id="executeDeveloper" class="buy-button">確認執行</button><button id="stopDeveloper" class="small-button" hidden>停止送出</button></div>
+        <p id="developerMessage" class="developer-message" role="status" aria-live="polite"></p>
+        <section id="developerResults" class="developer-results" aria-label="執行結果" hidden><div id="developerMetrics" class="developer-metrics"></div><p id="developerResultNote"></p><button id="refreshDeveloperState" class="small-button">重新查看資料</button></section>
+      </section>
+    </div>
+  </dialog>
   <div id="toast" class="toast" role="status" aria-live="polite" hidden><span id="toastIcon" class="toast-icon" aria-hidden="true"></span><span id="toastText"></span><button id="dismissToast" aria-label="關閉通知">×</button></div>
 </body>
 </html>

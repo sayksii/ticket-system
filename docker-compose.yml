@@ -62,6 +62,7 @@ services:
       ROCKETMQ_TOPIC: ticket-order-topic
       ROCKETMQ_PRODUCER_GROUP: ticket-order-producer-group
       BUY_MODE: ${BUY_MODE:-ATOMIC}
+      DEVELOPER_TOOLS_ENABLED: ${DEVELOPER_TOOLS_ENABLED:-false}
       DEMO_DELAY_MS: ${DEMO_DELAY_MS:-300}
     ports:
       - "18080:8080"

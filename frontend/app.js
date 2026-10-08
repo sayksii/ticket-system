@@ -292,3 +292,12 @@ renderOrders();
 void loadEvents();
 void loadOrders();
 if (state.pending.size) startPolling(true);
+
+window.addEventListener("ticket:developer-reset", event => {
+  const id = String(event.detail.eventId);
+  state.pending.delete(id);
+  persistPending();
+  void loadEvents();
+  void loadOrders();
+});
+window.addEventListener("ticket:developer-refresh", () => { void loadEvents(); void loadOrders(); });

@@ -21,10 +21,10 @@ public class MqAsyncBuyService {
     private static final long RESULT_NOT_OPEN = -4L;
 
     private static final DefaultRedisScript<Long> BUY_SCRIPT =
-            loadScript("lua/ticket-buy.lua");
+            loadScript("lua/ticket-mq-buy.lua", Long.class);
 
     private static final DefaultRedisScript<Long> COMPENSATE_SCRIPT =
-            loadScript("lua/ticket-compensate.lua");
+            loadScript("lua/ticket-mq-compensate.lua", Long.class);
 
     private final StringRedisTemplate redisTemplate;
     private final RocketMqProducer rocketMqProducer;
@@ -109,12 +109,12 @@ public class MqAsyncBuyService {
         );
     }
 
-    private static DefaultRedisScript<Long> loadScript(String path) {
-        DefaultRedisScript<Long> script = new DefaultRedisScript<>();
+    private static <T> DefaultRedisScript<T> loadScript(String path, Class<T> type) {
+        DefaultRedisScript<T> script = new DefaultRedisScript<>();
         script.setScriptSource(
                 new ResourceScriptSource(new ClassPathResource(path))
         );
-        script.setResultType(Long.class);
+        script.setResultType(type);
         return script;
     }
 
@@ -129,4 +129,5 @@ public class MqAsyncBuyService {
     private String statusKey(Long eventId) {
         return "ticket:{" + eventId + "}:status";
     }
+
 }

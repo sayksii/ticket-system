@@ -23,7 +23,7 @@ async function harness(buyResponse) {
   const context = vm.createContext({
     presentation, esc: escapeHtml, statusLabel, formatTime,
     document: { getElementById(id) { if (!elements.has(id)) elements.set(id, new Element(id)); return elements.get(id); }, querySelectorAll() { return filters; }, addEventListener() {} },
-    window: { sessionStorage: storage(), localStorage: storage() },
+    window: { sessionStorage: storage(), localStorage: storage(), addEventListener() {} },
     AbortController,
     setTimeout(fn, delay) { const id = ++nextTimer; timers.set(id, { fn, delay }); return id; },
     clearTimeout(id) { timers.delete(id); },

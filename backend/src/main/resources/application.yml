@@ -20,6 +20,8 @@ spring:
       encoding: UTF-8
 
 ticket:
+  developer:
+    enabled: ${DEVELOPER_TOOLS_ENABLED:false}
   buy-mode: ${BUY_MODE:ATOMIC}
   rocketmq:
     namesrv: ${ROCKETMQ_NAMESRV:rocketmq-namesrv:9876}

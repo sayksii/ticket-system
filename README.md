@@ -15,6 +15,14 @@
 
 Java 21 / Spring Boot / MySQL / Redis / RocketMQ / Docker / Kubernetes / Traefik / Jenkins / SonarQube / Harbor
 
+## 開發者工具
+
+右上角可預覽指令並確認執行：庫存/訂單查詢、多人搶票、重複購買測試及單一活動重設。多人測試上限 500 次、同時 10 次；取得資格與實際成立訂單分開統計。
+
+沒有登入或權限系統，僅供私人環境。預設 `DEVELOPER_TOOLS_ENABLED=false`，先更新全部 Backend、Order Worker 與 Frontend，再啟用 Backend 的此環境變數。重設僅支援 `REDIS_LUA_MQ`，會刪除所選活動的所有訂單，操作前須明確確認。
+
+重設直接呼叫 API，不新增資料表或保存確認單。請等搶票請求與訂單處理完成再重設；不支援邊搶票邊重設，也不會清空 MQ。重設失敗時活動保持關閉。
+
 ## 專案結構
 
 - `backend/`：API 與搶票邏輯

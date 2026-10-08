@@ -17,14 +17,23 @@ case "${SERVICE}" in
     ;;
 esac
 
+# 容許部署切換時的暫時性錯誤，持續失敗仍以非零狀態結束。
+ingress_get() {
+  curl -fsS \
+    --connect-timeout 3 \
+    --max-time 10 \
+    --retry 5 \
+    --retry-delay 2 \
+    --retry-max-time 70 \
+    --retry-connrefused \
+    -H "Host: ${HOST_HEADER}" \
+    "${INGRESS_URL}$1"
+}
+
 if [[ "${SERVICE}" == "ALL" || "${SERVICE}" == "backend" ]]; then
   echo "Smoke Test: Backend /api/health"
 
-  health="$(
-    curl -fsS \
-      -H "Host: ${HOST_HEADER}" \
-      "${INGRESS_URL}/api/health"
-  )"
+  health="$(ingress_get /api/health)"
 
   echo "${health}"
 
@@ -35,13 +44,8 @@ if [[ "${SERVICE}" == "ALL" || "${SERVICE}" == "frontend" ]]; then
   echo
   echo "Smoke Test: Frontend /"
 
-  curl -fsS \
-    -H "Host: ${HOST_HEADER}" \
-    "${INGRESS_URL}/" \
-    >/tmp/part8-frontend-smoke.html
-
-  test -s /tmp/part8-frontend-smoke.html
-  rm -f /tmp/part8-frontend-smoke.html
+  frontend="$(ingress_get /)"
+  test -n "${frontend}"
 
   echo "Frontend HTTP response: OK"
 fi
@@ -51,13 +55,13 @@ if [[ "${SERVICE}" == "ALL" || "${SERVICE}" == "order-worker" ]]; then
   echo "Smoke Test: Order Worker Ready Replicas"
 
   desired="$(
-    sudo kubectl get deployment ticket-order-worker \
+    sudo kubectl --request-timeout=10s get deployment ticket-order-worker \
       -n "${NAMESPACE}" \
       -o jsonpath='{.spec.replicas}'
   )"
 
   ready="$(
-    sudo kubectl get deployment ticket-order-worker \
+    sudo kubectl --request-timeout=10s get deployment ticket-order-worker \
       -n "${NAMESPACE}" \
       -o jsonpath='{.status.readyReplicas}'
   )"

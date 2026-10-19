@@ -143,15 +143,17 @@ pipeline {
 
         stage('SonarQube - Backend') {
             steps {
-                withSonarQubeEnv('sonarqube') {
-                    sh '''
-                      set -eu
+                dir('backend') {
+                    withSonarQubeEnv('sonarqube') {
+                        sh '''
+                          set -eu
 
-                      mvn -B -f backend/pom.xml \
-                        org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
-                        -Dsonar.projectKey=ticket-backend \
-                        -Dsonar.projectName="Ticket Backend"
-                    '''
+                          mvn -B \
+                            org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
+                            -Dsonar.projectKey=ticket-backend \
+                            -Dsonar.projectName="Ticket Backend"
+                        '''
+                    }
                 }
             }
         }
@@ -166,15 +168,17 @@ pipeline {
 
         stage('SonarQube - Order Worker') {
             steps {
-                withSonarQubeEnv('sonarqube') {
-                    sh '''
-                      set -eu
+                dir('order-worker') {
+                    withSonarQubeEnv('sonarqube') {
+                        sh '''
+                          set -eu
 
-                      mvn -B -f order-worker/pom.xml \
-                        org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
-                        -Dsonar.projectKey=ticket-order-worker \
-                        -Dsonar.projectName="Ticket Order Worker"
-                    '''
+                          mvn -B \
+                            org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
+                            -Dsonar.projectKey=ticket-order-worker \
+                            -Dsonar.projectName="Ticket Order Worker"
+                        '''
+                    }
                 }
             }
         }

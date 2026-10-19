@@ -17,14 +17,18 @@ import static org.mockito.Mockito.*;
 
 class DeveloperServiceTest {
     private DeveloperService service;
+    private JdbcDataSource source;
+    private StringRedisTemplate redis;
     private JdbcTemplate db;
     private Map<String, String> values;
     private boolean failFinish;
+    private boolean failRestore;
+    private long finishResult;
 
     @BeforeEach
     @SuppressWarnings({"unchecked", "rawtypes"})
     void setup() {
-        JdbcDataSource source = new JdbcDataSource();
+        source = new JdbcDataSource();
         source.setURL("jdbc:h2:mem:" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1");
         db = new JdbcTemplate(source);
         db.execute("CREATE TABLE ticket_event(id BIGINT PRIMARY KEY, name VARCHAR(100), total_stock INT, stock INT, version INT)");
@@ -32,7 +36,10 @@ class DeveloperServiceTest {
         db.update("INSERT INTO ticket_event VALUES(1, 'test', 20, 18, 2), (2, 'other', 10, 9, 1)");
         db.update("INSERT INTO ticket_order VALUES(1,1,'demo-abcdef123456-1','SUCCESS'),(2,1,'normal-user','SUCCESS'),(3,2,'other-user','SUCCESS')");
         values = new HashMap<>(Map.of("ticket:{1}:stock", "18", "ticket:{1}:status", "OPEN", "ticket:{1}:buyers", "2"));
-        StringRedisTemplate redis = mock(StringRedisTemplate.class);
+        redis = mock(StringRedisTemplate.class);
+        failFinish = false;
+        failRestore = false;
+        finishResult = 1L;
         ValueOperations<String, String> ops = mock(ValueOperations.class);
         SetOperations<String, String> sets = mock(SetOperations.class);
         when(redis.opsForValue()).thenReturn(ops);
@@ -40,9 +47,11 @@ class DeveloperServiceTest {
         when(ops.get(anyString())).thenAnswer(i -> values.get(i.getArgument(0)));
         when(ops.multiGet(anyCollection())).thenAnswer(i -> ((Collection<String>) i.getArgument(0)).stream().map(values::get).toList());
         when(sets.size(anyString())).thenAnswer(i -> Long.valueOf(values.getOrDefault(i.getArgument(0), "0")));
-        doAnswer(i -> { values.put(i.getArgument(0), i.getArgument(1)); return null; }).when(ops).set(anyString(), anyString());
+        doAnswer(i -> {
+            if (failRestore) throw new IllegalStateException("test Redis interruption");
+            values.put(i.getArgument(0), i.getArgument(1)); return null;
+        }).when(ops).set(anyString(), anyString());
         when(redis.execute(any(RedisScript.class), anyList(), any(Object[].class))).thenAnswer(i -> {
-            RedisScript script = i.getArgument(0);
             List<String> keys = i.getArgument(1);
             Object[] args = (Object[]) i.getRawArguments()[2];
             if (keys.size() == 1) {
@@ -52,6 +61,7 @@ class DeveloperServiceTest {
             }
             if (keys.size() == 3) {
                 if (failFinish) throw new IllegalStateException("test Redis interruption");
+                if (finishResult != 1L) return finishResult;
                 values.put(keys.get(0), args[0].toString()); values.put(keys.get(1), "0");
                 values.put(keys.get(2), "OPEN"); return 1L;
             }
@@ -121,5 +131,34 @@ class DeveloperServiceTest {
         values.clear();
         var result = service.reset(1, 20, 2);
         assertEquals(20, result.redisStock()); assertEquals("OPEN", result.status());
+    }
+    @Test void missingRedisResponseFailsWithoutChangingData() {
+        when(redis.opsForValue().multiGet(anyCollection())).thenReturn(null);
+        var error = assertThrows(ResponseStatusException.class, () -> service.snapshot(1, ""));
+        assertEquals(503, error.getStatusCode().value());
+        assertEquals(3, db.queryForObject("SELECT COUNT(*) FROM ticket_order", Integer.class));
+    }
+    @Test void missingRunPrefixIsRejected() {
+        var error = assertThrows(ResponseStatusException.class, () -> service.snapshot(1, null));
+        assertEquals(400, error.getStatusCode().value());
+    }
+    @Test void resetIsUnavailableOutsideMqMode() {
+        var other = new DeveloperService(source, redis, new DataSourceTransactionManager(source), "ATOMIC");
+        assertFalse(other.resetAvailable());
+        var error = assertThrows(ResponseStatusException.class, () -> other.reset(1, 20, 2));
+        assertEquals(409, error.getStatusCode().value());
+        assertEquals(3, db.queryForObject("SELECT COUNT(*) FROM ticket_order", Integer.class));
+    }
+    @Test void invalidRedisCompletionLeavesEventClosed() {
+        finishResult = 0L;
+        var error = assertThrows(ResponseStatusException.class, () -> service.reset(1, 20, 2));
+        assertEquals(503, error.getStatusCode().value());
+        assertEquals("RESET_FAILED", values.get("ticket:{1}:status"));
+    }
+    @Test void failedStatusRestoreDoesNotReopenEvent() {
+        failFinish = true;
+        failRestore = true;
+        assertThrows(ResponseStatusException.class, () -> service.reset(1, 20, 2));
+        assertEquals("RESETTING", values.get("ticket:{1}:status"));
     }
 }

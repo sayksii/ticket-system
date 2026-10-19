@@ -46,4 +46,27 @@ class DeveloperControllerTest {
                 .withBean(DeveloperService.class, () -> service)
                 .run(context -> assertEquals(0, context.getBeanNamesForType(DeveloperController.class).length));
     }
+    @Test void capabilitiesIncludeResetAvailabilityAndLimits() throws Exception {
+        when(service.resetAvailable()).thenReturn(true);
+        mvc.perform(get("/api/developer/capabilities"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.enabled").value(true))
+                .andExpect(jsonPath("$.resetAvailable").value(true))
+                .andExpect(jsonPath("$.maxRequests").value(500))
+                .andExpect(jsonPath("$.maxConcurrency").value(10));
+    }
+    @Test void statePassesEventAndRunPrefixToService() throws Exception {
+        var snapshot = new DeveloperService.Snapshot(1, "test", 20, 18, 18, 2, "OPEN", 2, 1, "now");
+        when(service.snapshot(1, "demo-abcdef123456-")).thenReturn(snapshot);
+        mvc.perform(get("/api/developer/events/1/state").param("runPrefix", "demo-abcdef123456-"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.eventId").value(1))
+                .andExpect(jsonPath("$.runOrders").value(1));
+        verify(service).snapshot(1, "demo-abcdef123456-");
+    }
+    @Test void trustedOriginCanSubmitConfirmedReset() throws Exception {
+        mvc.perform(post("/api/developer/reset").header("Origin", "http://ticket.local")
+                        .contentType("application/json")
+                        .content("{\"eventId\":1,\"stock\":20,\"expectedOrders\":7,\"confirmed\":true}"))
+                .andExpect(status().isOk());
+        verify(service).reset(1, 20, 7);
+    }
 }

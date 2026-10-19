@@ -18,6 +18,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @Service
 @ConditionalOnProperty(name = "ticket.developer.enabled", havingValue = "true")
 public class DeveloperService {
+    private static final String STOCK = "stock";
+    private static final String STATUS = "status";
     private final JdbcTemplate db;
     private final StringRedisTemplate redis;
     private final TransactionTemplate transaction;
@@ -48,16 +50,17 @@ public class DeveloperService {
             throw problem(HttpStatus.BAD_REQUEST, "測試識別碼不正確");
         }
         List<Snapshot> rows = db.query("SELECT id, name, total_stock, stock FROM ticket_event WHERE id = ?",
-                (rs, n) -> new Snapshot(rs.getLong("id"), rs.getString("name"), rs.getInt("total_stock"), rs.getInt("stock"),
+                (rs, n) -> new Snapshot(rs.getLong("id"), rs.getString("name"), rs.getInt("total_stock"), rs.getInt(STOCK),
                         null, 0, "", 0, 0, Instant.now().toString()), eventId);
         if (rows.isEmpty()) throw problem(HttpStatus.NOT_FOUND, "找不到活動");
         Snapshot event = rows.getFirst();
         String base = base(eventId);
-        List<String> values = redis.opsForValue().multiGet(List.of(base + "stock", base + "status"));
+        List<String> values = redis.opsForValue().multiGet(List.of(base + STOCK, base + STATUS));
+        if (values == null) throw problem(HttpStatus.SERVICE_UNAVAILABLE, "讀取 Redis 資料失敗");
         Long buyers = redis.opsForSet().size(base + "buyers");
         long orders = countOrders(eventId);
-        long runOrders = runPrefix.isEmpty() ? 0 : db.queryForObject(
-                "SELECT COUNT(*) FROM ticket_order WHERE event_id = ? AND user_id LIKE ? AND status = 'SUCCESS'", Long.class, eventId, runPrefix + "%");
+        long runOrders = runPrefix.isEmpty() ? 0 : queryCount(
+                "SELECT COUNT(*) FROM ticket_order WHERE event_id = ? AND user_id LIKE ? AND status = 'SUCCESS'", eventId, runPrefix + "%");
         return new Snapshot(event.eventId(), event.name(), event.totalStock(), event.mysqlStock(),
                 values.get(0) == null ? null : Integer.valueOf(values.get(0)), buyers == null ? 0 : buyers,
                 values.get(1) == null ? "未預熱" : values.get(1), orders, runOrders, Instant.now().toString());
@@ -70,29 +73,23 @@ public class DeveloperService {
         if (expectedOrders < 0) throw problem(HttpStatus.BAD_REQUEST, "訂單筆數不正確");
         snapshot(eventId, "");
         String base = base(eventId);
-        String previous = redis.execute(CLOSE, List.of(base + "status"));
+        String previous = redis.execute(CLOSE, List.of(base + STATUS));
         if (previous == null || "BUSY".equals(previous)) throw problem(HttpStatus.CONFLICT, "此活動已有重設進行中");
         AtomicBoolean changed = new AtomicBoolean(false);
         try {
             transaction.executeWithoutResult(tx -> {
                 db.queryForObject("SELECT id FROM ticket_event WHERE id = ? FOR UPDATE", Long.class, eventId);
                 Snapshot current = snapshot(eventId, "");
-                if (current.orderCount() != expectedOrders) {
-                    throw problem(HttpStatus.CONFLICT, "資料已變動，尚未刪除，請重新預覽");
-                }
-                if (!"RESET_FAILED".equals(previous) && current.redisStock() != null
-                        && (current.redisStock() != current.mysqlStock() || current.buyers() != current.orderCount())) {
-                    throw problem(HttpStatus.CONFLICT, "請等訂單處理完再重設");
-                }
+                verifyResetState(current, expectedOrders, previous);
                 changed.set(true);
                 db.update("DELETE FROM ticket_order WHERE event_id = ?", eventId);
                 db.update("UPDATE ticket_event SET total_stock = ?, stock = ?, version = 0 WHERE id = ?",
                         stock, stock, eventId);
             });
-            Long finished = redis.execute(FINISH, List.of(base + "stock", base + "buyers", base + "status"), Integer.toString(stock));
+            Long finished = redis.execute(FINISH, List.of(base + STOCK, base + "buyers", base + STATUS), Integer.toString(stock));
             if (!Long.valueOf(1).equals(finished)) throw new IllegalStateException("Redis 重設失敗");
         } catch (RuntimeException e) {
-            try { redis.opsForValue().set(base + "status", changed.get() ? "RESET_FAILED" : previous); }
+            try { redis.opsForValue().set(base + STATUS, changed.get() ? "RESET_FAILED" : previous); }
             catch (RuntimeException ignored) { /* Redis 中斷時保留 RESETTING，不自動解鎖。 */ }
             if (e instanceof ResponseStatusException response) throw response;
             throw problem(HttpStatus.SERVICE_UNAVAILABLE, "重設失敗，活動保持關閉，請重新查看資料");
@@ -100,8 +97,23 @@ public class DeveloperService {
         return snapshot(eventId, "");
     }
 
+    private void verifyResetState(Snapshot current, long expectedOrders, String previous) {
+        if (current.orderCount() != expectedOrders) {
+            throw problem(HttpStatus.CONFLICT, "資料已變動，尚未刪除，請重新預覽");
+        }
+        if (!"RESET_FAILED".equals(previous) && current.redisStock() != null
+                && (current.redisStock() != current.mysqlStock() || current.buyers() != current.orderCount())) {
+            throw problem(HttpStatus.CONFLICT, "請等訂單處理完再重設");
+        }
+    }
+
     private long countOrders(long eventId) {
-        return db.queryForObject("SELECT COUNT(*) FROM ticket_order WHERE event_id = ?", Long.class, eventId);
+        return queryCount("SELECT COUNT(*) FROM ticket_order WHERE event_id = ?", eventId);
+    }
+    private long queryCount(String sql, Object... args) {
+        Long count = db.queryForObject(sql, Long.class, args);
+        if (count == null) throw problem(HttpStatus.SERVICE_UNAVAILABLE, "讀取訂單筆數失敗");
+        return count;
     }
     private void requireMq() {
         if (!resetAvailable()) throw problem(HttpStatus.CONFLICT, "重設工具僅支援 REDIS_LUA_MQ 模式");

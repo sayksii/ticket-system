@@ -10,6 +10,7 @@
 - RocketMQ + Order Worker：非同步下單，透過 MySQL 交易與冪等處理更新訂單及庫存。
 - 異常處理：MQ 發送失敗時回補 Redis，前端確認訂單成立後才顯示成功。
 - CI/CD：Jenkins 執行測試與品質檢查，在 Harbor VM 遠端建置、推送映像，再進行 Kubernetes 滾動更新與 Smoke Test。
+- HPA：Backend 依 CPU 負載自動調整為 2～4 個 Pod。
 
 ## 技術
 

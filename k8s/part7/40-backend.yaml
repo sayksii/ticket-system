@@ -18,7 +18,7 @@ metadata:
   name: ticket-backend
   namespace: devops-test
 spec:
-  replicas: 2
+  # Pod 數量由 80-backend-hpa.yaml 管理。
   revisionHistoryLimit: 5
   strategy:
     type: RollingUpdate

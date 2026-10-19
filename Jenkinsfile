@@ -120,6 +120,7 @@ pipeline {
 
                   mvn -B -f backend/pom.xml clean test
                   mvn -B -f order-worker/pom.xml clean test
+                  bash scripts/hpa.test.sh
                 '''
             }
         }
@@ -305,6 +306,7 @@ pipeline {
                       scp -q \
                         ci/part8/k8s-release.sh \
                         scripts/part8-smoke.sh \
+                        k8s/part7/80-backend-hpa.yaml \
                         "ubuntu@${DEPLOY_HOST}:${REMOTE_DEPLOY_DIR}/"
 
                       ssh -o BatchMode=yes \

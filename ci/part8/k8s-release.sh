@@ -26,7 +26,39 @@ case "${SERVICE}" in
     ;;
 esac
 
+apply_backend_hpa() {
+  local script_dir manifest available
+  script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+  manifest="${BACKEND_HPA_FILE:-${script_dir}/80-backend-hpa.yaml}"
+  if [[ -z "${BACKEND_HPA_FILE:-}" && ! -f "${manifest}" ]]; then
+    manifest="${script_dir}/../../k8s/part7/80-backend-hpa.yaml"
+  fi
+  if [[ ! -f "${manifest}" ]]; then
+    echo "Missing Backend HPA manifest: ${manifest}" >&2
+    return 1
+  fi
+  if [[ ! "${NAMESPACE}" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$ || ${#NAMESPACE} -gt 63 ]]; then
+    echo "Invalid NAMESPACE: ${NAMESPACE}" >&2
+    return 2
+  fi
+
+  if ! available="$(sudo kubectl --request-timeout=15s get apiservice v1beta1.metrics.k8s.io \
+      -o jsonpath='{.status.conditions[?(@.type=="Available")].status}')"; then
+    echo "Cannot read Metrics API. Check metrics-server before enabling HPA." >&2
+    return 1
+  fi
+  if [[ "${available}" != "True" ]]; then
+    echo "Metrics API is not ready. Check metrics-server before enabling HPA." >&2
+    return 1
+  fi
+
+  # Jenkins 傳來的檔案與直接在專案內執行都可使用，並沿用部署的 namespace。
+  sed "s/^  namespace: devops-test$/  namespace: ${NAMESPACE}/" "${manifest}" | \
+    sudo kubectl --request-timeout=15s apply -n "${NAMESPACE}" -f -
+}
+
 deploy_backend() {
+  apply_backend_hpa
   sudo kubectl set image \
     deployment/ticket-backend \
     "backend=${REGISTRY}/${PROJECT}/ticket-backend:${TAG}" \
@@ -110,6 +142,7 @@ case "${ACTION}" in
   show)
     if [[ "${SERVICE}" == "ALL" || "${SERVICE}" == "backend" ]]; then
       show_image "ticket-backend"
+      sudo kubectl --request-timeout=15s get hpa ticket-backend -n "${NAMESPACE}"
     fi
 
     if [[ "${SERVICE}" == "ALL" || "${SERVICE}" == "order-worker" ]]; then

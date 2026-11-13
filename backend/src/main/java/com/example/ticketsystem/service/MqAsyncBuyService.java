@@ -82,13 +82,13 @@ public class MqAsyncBuyService {
         } catch (RuntimeException e) {
             compensate(eventId, userId);
             return new BuyResponse(
-                    false,
-                    "取得資格，但 RocketMQ 送出失敗；已退回 Redis 資格",
-                    null,
-                    null,
-                    "MQ_SEND_FAILED",
-                    messageId
-            );
+                        false,
+                        "取得資格，但 RocketMQ 送出失敗；已退回 Redis 資格",
+                        null,
+                        null,
+                        "MQ_SEND_FAILED",
+                        messageId
+                );
         }
 
         return new BuyResponse(

@@ -17,7 +17,7 @@ data:
   ROCKETMQ_CONSUMER_GROUP: ticket-order-consumer-group
 
   BUY_MODE: REDIS_LUA_MQ
-  # 先完成 Backend / Worker 更新，再於私人展示環境啟用。
-  DEVELOPER_TOOLS_ENABLED: "false"
+  # 僅供私人展示環境；Backend / Worker 須先完成更新。
+  DEVELOPER_TOOLS_ENABLED: "true"
   DEMO_DELAY_MS: "0"
   ORDER_CONSUMER_DELAY_MS: "0"

@@ -194,7 +194,7 @@ async function buy(id) {
     if (result.success === true) {
       state.pending.set(id, pending);
       persistPending();
-      // QUEUED 只是取得資格。只有 GET /orders 看見 SUCCESS 才顯示成功。
+      // QUEUED 只是取得資格。只有 GET /api/orders 查到 SUCCESS，畫面才顯示成功。
       notify(result.status === "QUEUED" ? "已取得搶票資格，正在建立訂單…" : "已送出，正在確認你的訂單…", "pending");
     } else if (result.success === false) {
       notify(result.message || "尚未取得票券，請重新整理後確認。", "error");
